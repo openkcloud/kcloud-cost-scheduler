@@ -83,7 +83,9 @@ func (p *WorkloadAwareCost) Score(ctx context.Context, pod *v1.Pod, nodeName str
 	}
 
 	if costUSD <= 0 {
-		return 0, utils.NewStatus(utils.Success, "")
+		klog.V(4).InfoS("WorkloadAwareCost: predicted-cost-gpu/npu is missing or invalid, returning neutral score",
+			"pod", pod.Name, "node", nodeName, "device", devType, "costUSD", costUSD)
+		return 5, utils.NewStatus(utils.Success, "predicted cost missing or invalid")
 	}
 
 	const maxCostUSD = 1.0
@@ -144,7 +146,9 @@ func (p *WorkloadAwarePower) Score(ctx context.Context, pod *v1.Pod, nodeName st
 	}
 
 	if powerW <= 0 {
-		return 0, utils.NewStatus(utils.Success, "")
+		klog.V(4).InfoS("WorkloadAwarePower: predicted-power-gpu/npu is missing or invalid, returning neutral score",
+			"pod", pod.Name, "node", nodeName, "device", devType, "powerW", powerW)
+		return 5, utils.NewStatus(utils.Success, "predicted power missing or invalid")
 	}
 
 	ratio := powerW / tdp
