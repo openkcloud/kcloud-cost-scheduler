@@ -1,9 +1,3 @@
-/*
-Common scheduling utility types and constants
-
-This module defines shared data structures such as Resource allocations
-and HostPort mappings used throughout the scheduling framework.
-*/
 package utils
 
 import (
@@ -17,11 +11,13 @@ import (
 
 const DefaultBindAllHostIP = "0.0.0.0"
 
+// ProtocolPort represents a protocol port pair, e.g. tcp:80.
 type ProtocolPort struct {
 	Protocol string
 	Port     int32
 }
 
+// NewProtocolPort creates a ProtocolPort instance.
 func NewProtocolPort(protocol string, port int32) *ProtocolPort {
 	pp := &ProtocolPort{
 		Protocol: protocol,
@@ -35,8 +31,10 @@ func NewProtocolPort(protocol string, port int32) *ProtocolPort {
 	return pp
 }
 
+// HostPortInfo stores mapping from ip to a set of ProtocolPort
 type HostPortInfo map[string]map[ProtocolPort]struct{}
 
+// Add adds (ip, protocol, port) to HostPortInfo
 func (h HostPortInfo) Add(ip, protocol string, port int32) {
 	if port <= 0 {
 		return
@@ -55,6 +53,7 @@ func (h HostPortInfo) Add(ip, protocol string, port int32) {
 	h[ip][*pp] = struct{}{}
 }
 
+// Remove removes (ip, protocol, port) from HostPortInfo
 func (h HostPortInfo) Remove(ip, protocol string, port int32) {
 	if port <= 0 {
 		return
@@ -71,6 +70,7 @@ func (h HostPortInfo) Remove(ip, protocol string, port int32) {
 	}
 }
 
+// Len returns the total number of (ip, protocol, port) tuple in HostPortInfo
 func (h HostPortInfo) Len() int {
 	length := 0
 	for _, m := range h {
@@ -79,6 +79,8 @@ func (h HostPortInfo) Len() int {
 	return length
 }
 
+// CheckConflict checks if the input (ip, protocol, port) conflicts with the existing
+// ones in HostPortInfo.
 func (h HostPortInfo) CheckConflict(ip, protocol string, port int32) bool {
 	if port <= 0 {
 		return false
@@ -88,6 +90,7 @@ func (h HostPortInfo) CheckConflict(ip, protocol string, port int32) bool {
 
 	pp := NewProtocolPort(protocol, port)
 
+	// If ip is 0.0.0.0 check all IP's (protocol, port) pair
 	if ip == DefaultBindAllHostIP {
 		for _, m := range h {
 			if _, ok := m[*pp]; ok {
@@ -97,6 +100,7 @@ func (h HostPortInfo) CheckConflict(ip, protocol string, port int32) bool {
 		return false
 	}
 
+	// If ip isn't 0.0.0.0, only check IP and 0.0.0.0's (protocol, port) pair
 	for _, key := range []string{DefaultBindAllHostIP, ip} {
 		if m, ok := h[key]; ok {
 			if _, ok2 := m[*pp]; ok2 {
@@ -108,6 +112,7 @@ func (h HostPortInfo) CheckConflict(ip, protocol string, port int32) bool {
 	return false
 }
 
+// sanitize the parameters
 func (h HostPortInfo) sanitize(ip, protocol *string) {
 	if len(*ip) == 0 {
 		*ip = DefaultBindAllHostIP
@@ -121,16 +126,21 @@ type Resource struct {
 	MilliCPU         int64
 	Memory           int64
 	EphemeralStorage int64
+	// We store allowedPodNumber (which is Node.Status.Allocatable.Pods().Value())
+	// explicitly as int, to avoid conversions and improve performance.
 	AllowedPodNumber int
+	// ScalarResources
 	ScalarResources map[v1.ResourceName]int64
 }
 
+// NewResource creates a Resource from ResourceList
 func NewResource(rl v1.ResourceList) *Resource {
 	r := &Resource{}
 	r.Add(rl)
 	return r
 }
 
+// Add adds ResourceList into Resource.
 func (r *Resource) Add(rl v1.ResourceList) {
 	if r == nil {
 		return
@@ -159,6 +169,7 @@ func IsScalarResourceName(name v1.ResourceName) bool {
 		v1helper.IsPrefixedNativeResource(name) || v1helper.IsAttachableVolumeResourceName(name)
 }
 
+// Clone returns a copy of this resource.
 func (r *Resource) Clone() *Resource {
 	res := &Resource{
 		MilliCPU:         r.MilliCPU,
@@ -175,17 +186,21 @@ func (r *Resource) Clone() *Resource {
 	return res
 }
 
+// AddScalar adds a resource by a scalar value of this resource.
 func (r *Resource) AddScalar(name v1.ResourceName, quantity int64) {
 	r.SetScalar(name, r.ScalarResources[name]+quantity)
 }
 
+// SetScalar sets a resource by a scalar value of this resource.
 func (r *Resource) SetScalar(name v1.ResourceName, quantity int64) {
+	// Lazily allocate scalar resource map.
 	if r.ScalarResources == nil {
 		r.ScalarResources = map[v1.ResourceName]int64{}
 	}
 	r.ScalarResources[name] = quantity
 }
 
+// SetMaxResource compares with ResourceList and takes max value for each Resource.
 func (r *Resource) SetMaxResource(rl v1.ResourceList) {
 	if r == nil {
 		return
@@ -219,6 +234,7 @@ func GetPodKey(pod *v1.Pod) (string, error) {
 	return uid, nil
 }
 
+// GetCurrentTimeMillis returns current time in milliseconds
 func GetCurrentTimeMillis() int64 {
 	return time.Now().UnixMilli()
 }
