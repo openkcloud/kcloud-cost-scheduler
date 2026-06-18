@@ -47,7 +47,14 @@ func NewCache(ctx context.Context) *Cache {
 func (cache *Cache) Nodes() map[string]*NodeInfo {
 	cache.mu.RLock()
 	defer cache.mu.RUnlock()
-	return cache.nodes
+	
+	// Return a copy of the map to prevent external modification of the internal cache.
+	// This ensures immutability of the returned map.
+	nodesCopy := make(map[string]*NodeInfo, len(cache.nodes))
+	for k, v := range cache.nodes {
+		nodesCopy[k] = v
+	}
+	return nodesCopy
 }
 
 func (cache *Cache) InitCache(client *kubernetes.Clientset) error {
